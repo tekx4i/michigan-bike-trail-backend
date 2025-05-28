@@ -1,0 +1,316 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model auth_log {
+  id         Int           @id @default(autoincrement())
+  user_id    Int
+  type       auth_log_type @default(login)
+  created_at DateTime      @default(now())
+  users      users         @relation(fields: [user_id], references: [id])
+}
+
+enum auth_log_type {
+  login
+  logout
+}
+
+model users {
+  id             Int       @id @default(autoincrement())
+  // name           String
+  firstName      String?
+  lastName       String?
+  language       String?
+  aboutMe        String?
+  units          String?
+  email          String    @unique
+  role_id        Int
+  status         String
+  gender         String?
+  number         String?
+  password       String    @db.Text
+  remember_token String?   @db.Text
+  deleted        Boolean   @default(false)
+  created_by     Int?
+  lat_long       String?
+  postal_code    String?
+  address        String?
+  city           String?
+  country        String?
+  // image          String?
+  file_name      String?
+  original_name  String?
+  state          String?
+  birth_date     DateTime? @db.Date
+  last_login     DateTime  @default(now())
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now())
+
+  role                   roles                   @relation(fields: [role_id], references: [id])
+  auth_log               auth_log[]
+  notifications          notifications[]
+  rating                 rating[]
+  UserFavoriteActivities UserFavoriteActivities?
+  favouriteTrails        FavouriteTrails[]
+  createdTrails          trails[]                @relation("CreatedTrails")
+  updatedTrails          trails[]                @relation("UpdatedTrails")
+}
+
+model roles {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+  deleted     Boolean  @default(false)
+  users       users[]
+}
+
+model notifications {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  type       String
+  message    String
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user users @relation(fields: [user_id], references: [id])
+}
+
+enum TrailStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model trails {
+  id                 Int                @id @default(autoincrement())
+  name               String?
+  notes              String?            @db.Text
+  description        String?            @db.Text
+  latitude           String?
+  longitude          String?
+  surfaceType        String?
+  difficultyLevel    String?
+  type               String?            @default("TRAIL")
+  location           String?
+  trailDistance      Float?             @default(0)
+  estimatedTime      String?
+  trail_head_address String?
+  created_by         Int
+  updated_by         Int?
+  created_at         DateTime           @default(now())
+  updated_at         DateTime           @updatedAt
+  deleted            Boolean            @default(false)
+  avgRating          Float?             @default(0)
+  status             String             @default("PENDING")
+  postal_code        String?
+  ratingCounts       Int?               @default(0)
+  parentId           Int? // Optional parent reference
+  slug               String?            @unique
+  activities         Json?
+  trailInfo          Json?
+  elevationGain      Float?             @default(0)
+  parent             trails?            @relation("ParentChild", fields: [parentId], references: [id]) // Self-referencing
+  children           trails[]           @relation("ParentChild")
+  rating             rating[]
+  trail_gallery      trail_gallery[]
+  gpxFiles           GPXFile[]
+  favouriteTrails    FavouriteTrails[]
+  trailAssociationId Int?
+  trailAssociation   TrailAssociations? @relation(fields: [trailAssociationId], references: [id])
+  createdByUser      users              @relation("CreatedTrails", fields: [created_by], references: [id])
+  updatedByUser      users?             @relation("UpdatedTrails", fields: [updated_by], references: [id])
+}
+
+model FavouriteTrails {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  trailId   Int
+  createdAt DateTime @default(now())
+
+  user  users  @relation(fields: [userId], references: [id])
+  trail trails @relation(fields: [trailId], references: [id])
+
+  @@unique([userId, trailId]) // Ensure a user can only mark a trail as a favorite once
+}
+
+//
+model GPXFile {
+  id           Int        @id @default(autoincrement())
+  trailId      Int
+  trail        trails     @relation(fields: [trailId], references: [id], onDelete: Cascade)
+  filePath     String // Path to the uploaded file
+  originalName String // Original file name
+  creator      String?
+  name         String?
+  deleted      Boolean    @default(false)
+  time         DateTime?
+  waypoints    Waypoint[]
+  tracks       Track[]
+  routes       Route[]
+  createdAt    DateTime   @default(now())
+}
+
+model Waypoint {
+  id        Int       @id @default(autoincrement())
+  gpxFileId Int
+  gpxFile   GPXFile   @relation(fields: [gpxFileId], references: [id], onDelete: Cascade)
+  name      String?
+  lat       Float
+  lon       Float
+  elevation Float?
+  time      DateTime?
+}
+
+model Track {
+  id        Int            @id @default(autoincrement())
+  gpxFileId Int
+  gpxFile   GPXFile        @relation(fields: [gpxFileId], references: [id], onDelete: Cascade)
+  name      String?
+  segments  TrackSegment[]
+}
+
+model TrackSegment {
+  id        Int       @id @default(autoincrement())
+  trackId   Int
+  track     Track     @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  lat       Float
+  lon       Float
+  elevation Float?
+  time      DateTime?
+}
+
+model Route {
+  id        Int          @id @default(autoincrement())
+  gpxFileId Int
+  gpxFile   GPXFile      @relation(fields: [gpxFileId], references: [id], onDelete: Cascade)
+  name      String?
+  points    RoutePoint[]
+}
+
+model RoutePoint {
+  id        Int       @id @default(autoincrement())
+  routeId   Int
+  route     Route     @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  lat       Float
+  lon       Float
+  elevation Float?
+  time      DateTime?
+}
+
+model trail_gallery {
+  id            Int      @id @default(autoincrement())
+  trail_id      Int
+  image         String?
+  original_name String
+  file_name     String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  trail trails @relation(fields: [trail_id], references: [id])
+}
+
+enum PERMIT_REQ {
+  ENTRY_FEE
+  PERMIT_REQUIRED
+}
+
+model rating {
+  id             Int       @id @default(autoincrement())
+  trail_id       Int
+  user_id        Int
+  rating         Int
+  description    String?
+  experience     String?
+  difficulty     String?
+  parkingLotSize Int?
+  parkingCost    String?
+  access         String?
+  condition      String?
+  activityType   String?
+  dateVisited    DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  deleted        Boolean   @default(false)
+
+  trails trails @relation(fields: [trail_id], references: [id])
+  user   users  @relation(fields: [user_id], references: [id])
+
+  images RatingImage[]
+}
+
+model RatingImage {
+  id            Int      @id @default(autoincrement())
+  rating_id     Int
+  file_name     String
+  original_name String
+  url           String
+  created_at    DateTime @default(now())
+
+  rating rating @relation(fields: [rating_id], references: [id], onDelete: Cascade)
+}
+
+model location {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  latitude    String
+  longitude   String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model UserFavoriteActivities {
+  id      Int   @id @default(autoincrement())
+  user_id Int   @unique
+  user    users @relation(fields: [user_id], references: [id])
+
+  backpacking          Boolean? @default(false)
+  cross_country_skiing Boolean? @default(false)
+  horseback_riding     Boolean? @default(false)
+  snowshoeing          Boolean? @default(false)
+  mountain_biking      Boolean? @default(false)
+  skiing               Boolean? @default(false)
+  fishing              Boolean? @default(false)
+  running              Boolean? @default(false)
+  hiking               Boolean? @default(false)
+  birding              Boolean? @default(false)
+  camping              Boolean? @default(false)
+  scenic_driving       Boolean? @default(false)
+  off_road_driving     Boolean? @default(false)
+  via_ferrata          Boolean? @default(false)
+  rock_climbing        Boolean? @default(false)
+  road_biking          Boolean? @default(false)
+  walking              Boolean? @default(false)
+  bike_touring         Boolean? @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model TrailAssociations {
+  id            Int     @id @default(autoincrement())
+  title         String
+  url           String?
+  description   String? @db.Text
+  regionName    String
+  file_name     String?
+  original_name String?
+  email         String?
+  phoneNo       String?
+
+  lat       String?
+  lng       String?
+  deleted   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trails trails[]
+}
